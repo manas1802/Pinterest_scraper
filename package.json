@@ -1,7 +1,7 @@
 {
   "name": "pinterest-scraper",
-  "version": "1.0.0",
-  "description": "Web Scraper Application for Pinterest, Made Using TypeScript-Based Selenium Web Driver, Allows You to Extract a Specified or Unlimited Amount of Data via the Pinterest URL You Specify.",
+  "version": "2.0.0",
+  "description": "Enhanced Pinterest Scraper - Extract images with metadata (ID, title, description, alt text) and export to Excel",
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
@@ -27,7 +27,9 @@
     "web-scraping",
     "pinterest-scraper",
     "selenium-webdriver",
-    "selenium-scraper"
+    "selenium-scraper",
+    "excel-export",
+    "metadata-extraction"
   ],
   "author": {
     "name": "Bes-js",
@@ -37,9 +39,11 @@
   "dependencies": {
     "chalk": "^4.1.2",
     "dotenv": "^16.4.5",
-    "selenium-webdriver": "^4.33.0"
+    "selenium-webdriver": "^4.33.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.3"
   }

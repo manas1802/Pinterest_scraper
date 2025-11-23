@@ -2,76 +2,39 @@ import { Builder, By, ThenableWebDriver } from 'selenium-webdriver';
 import * as chrome from 'selenium-webdriver/chrome';
 import chalk from 'chalk';
 import PinterestError from './errorHandler';
+import { PinData } from '../types/pinterest';
 
-
-
-/**
- * @class Pinterest
- * @description A class to collect images from Pinterest.
- * @public
- * @example const pinterest = new Pinterest("https://www.pinterest.com/pin/1234567890/");
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
- */
 export default class Pinterest {
-
-    private pinList: string[];
+    private pinDataList: PinData[];
     private website: string;
     private userAgent: unknown;
     private driver: ThenableWebDriver;
+    private processedIds: Set<string>;
 
-    /**
-     * @constructor
-     * @description Creates an instance of Pinterest.
-     * @param {string} websiteURL
-     * @memberof Pinterest
-     * @public
-     * @example const pinterest = new Pinterest("https://www.pinterest.com/pin/1234567890/");
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
-     */
-constructor(websiteURL: string) {
-  this.pinList = [];
-  this.website = websiteURL;
+    constructor(websiteURL: string) {
+        this.pinDataList = [];
+        this.processedIds = new Set();
+        this.website = websiteURL;
 
-  const options = new chrome.Options()
-    .windowSize({ width: 1920, height: 1080 })
-    .addArguments('--headless', '--no-sandbox', '--disable-gpu', 'log-level=3');
+        const options = new chrome.Options()
+            .windowSize({ width: 1920, height: 1080 })
+            .addArguments( '--no-sandbox', '--disable-gpu', 'log-level=3');
 
-  this.driver = new Builder()
-    .forBrowser('chrome')
-    .setChromeOptions(options)
-    .build();
+        this.driver = new Builder()
+            .forBrowser('chrome')
+            .setChromeOptions(options)
+            .build();
 
-  this.userAgent = this.driver.executeScript('return navigator.userAgent;');
-}
+        this.userAgent = this.driver.executeScript('return navigator.userAgent;');
+    }
 
-    /**
-     * @method login
-     * @description Logs in to the Pinterest account.
-     * @param {string} email
-     * @param {string} password
-     * @param {number} [scrollCount=1]
-     * @returns {Promise<string[] | any[]>}
-     * @memberof Pinterest
-     * @public
-     * @example const images = await pinterest.login("[email protected]", "password", 5);
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number}
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise}
-     * @see {@link https://seleniumhq.github.io/selenium/docs/api/javascript/module/selenium-webdriver/index_exports_ThenableWebDriver.html}
-     */
-    async login(email: string, password: string, scrollCount: number = 1): Promise<string[] | any[]> {
+    async login(email: string, password: string, scrollCount: number = 1): Promise<PinData[]> {
         try {
-
             await this.driver.get("https://pinterest.com/login");
-            await this.driver.manage().setTimeouts({ implicit: 3000 });
-            for (let i = 0; i < 3; i++) {
-                try {
-                    await this.driver.findElement(By.id("email"));
-                    break;
-                } catch (error) {
-                    await this.driver.sleep(1000);
-                }
-            }
+            await this.driver.manage().setTimeouts({ implicit: 5000 });
+            
+            await this.driver.sleep(3000);
+            
             const emailKey = await this.driver.findElement(By.id("email"));
             const passwordKey = await this.driver.findElement(By.id("password"));
 
@@ -79,154 +42,184 @@ constructor(websiteURL: string) {
             await passwordKey.sendKeys(password);
             await this.driver.sleep(1000);
             await this.driver.findElement(By.xpath("//button[@type='submit']")).click();
-            await this.driver.sleep(5000);
+            
+            await this.driver.sleep(8000);
 
-            var images: string[] = await this.pinCollector(scrollCount, this.website);
-            return images;
-
+            const pinData = await this.pinCollector(scrollCount, this.website);
+            return pinData;
         } catch (error) {
             throw new PinterestError((error as Error).message);
         }
-    };
+    }
 
+async pinCollector(scrollCount: number, url: string = this.website): Promise<PinData[]> {
+    if (scrollCount < 0) { scrollCount = 999; }
 
-    /**
-     * @method mouseScrool
-     * @description Scrolls the page to the end and collects the images.
-     * @returns {Promise<void>}
-     * @memberof Pinterest
-     * @public
-     * @example await pinterest.mouseScrool();
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
-     */
-    async mouseScrool(): Promise<void> {
-        var timeout = 0;
-        var height = await this.driver.executeScript("return document.body.scrollHeight");
-        while (true) {
+    await this.driver.get(url);
+    await this.driver.manage().setTimeouts({ implicit: 5000 });
+    
+    await this.driver.sleep(8000);
+    
+    console.log(chalk.cyan('Starting to collect pins...'));
 
-            await this.driver.executeScript("window.scrollTo(0, document.body.scrollHeight);");
-            await this.driver.sleep(5000);
-            var nowHeight: unknown = await this.driver.executeScript("return document.body.scrollHeight");
+    let noNewContentCount = 0;
 
-            if (nowHeight != height) {
-                await this.returnImages();
-                break;
-            } else {
-                timeout++;
-                if (timeout >= 10) {
-                    throw new PinterestError("The page could not be loaded due to your internet connection or we have reached the end of the page.");
+    for (let i = 0; i < scrollCount; i++) {
+        try {
+            const previousCount = this.pinDataList.length;
+            
+            // Extract current pins
+            await this.extractPinData();
+            
+            // REDUCED: Scroll in TINY steps - only 150px at a time
+            console.log(chalk.gray(`  Scrolling slowly (150px x 20 steps)...`));
+            for (let step = 0; step < 20; step++) {
+                await this.driver.executeScript("window.scrollBy(0, 150);"); // REDUCED from 300-400
+                await this.driver.sleep(300); // Wait after each tiny scroll
+                
+                // Extract pins every 5 steps
+                if (step % 5 === 0) {
+                    await this.extractPinData();
                 }
             }
-        }
-        await this.driver.sleep(3000);
-    };
-
-
-    /**
-     * @method pinCollector
-     * @description Collects the images from the given Pinterest URL.
-     * @param {number} scrollCount
-     * @param {string} [url=this.website]
-     * @returns {Promise<string[] | any[]>}
-     * @memberof Pinterest
-     * @public
-     * @example const images = await pinterest.pinCollector(5, "https://www.pinterest.com/pin/1234567890/");
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
-     */
-    async pinCollector(scrollCount: number, url: string = this.website): Promise<string[] | any[]> {
-        if (scrollCount < 0) { scrollCount = 999; }
-
-        await this.driver.get(url);
-        await this.driver.manage().setTimeouts({ implicit: 3000 });
-
-        for (let i = 0; i < scrollCount; i++) {
-            try { await this.mouseScrool(); } catch (err) { console.error((err as Error).message); };
-            console.log(chalk.green(`${(i+1)} Number of Pages Passed, Currently Collected Pin ${this.pinList.length} Count`));
-        }
-
-        console.log(chalk.green(`Total ${this.pinList.length} Number of Images Collected`));
-        this.driver.quit();
-
-        var returnedImages: string[] = this.getImages();
-        if (returnedImages.length == 0) return [];
-        return returnedImages;
-    };
-
-
-    /**
-     * @method returnImages
-     * @description Returns the collected images.
-     * @returns {Promise<string[] | any[]>}
-     * @memberof Pinterest
-     * @public
-     * @example const images = await pinterest.returnImages();
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
-     */
-    async returnImages(): Promise<string[] | any[]> {
-        const request: string = await this.driver.getPageSource();
-        const pins: RegExpMatchArray | null = request.match(/<img.*?src=["'](.*?)["']/g);
-        if (pins === null) return [];
-
-        for (const pin of pins) {
-            var source: RegExpMatchArray | null | string = pin.match(/src=["'](.*?)["']/);
-            if (source == null) continue;
-            source = source[1] as string;
-
-            if (!source.includes("75x75_RS") && !source.includes("/30x30_RS/") && !this.pinList.includes(source)) {
-                this.pinList.push(this.replacer(source));
+            
+            // Small scroll to trigger Pinterest's infinite load
+            await this.driver.executeScript("window.scrollBy(0, 500);");
+            
+            // INCREASED: Wait longer for Pinterest to load
+            console.log(chalk.gray(`  Waiting for Pinterest to load new pins...`));
+            await this.driver.sleep(8000); // INCREASED from 5000
+            
+            // Final extract
+            await this.extractPinData();
+            
+            const newPinsCount = this.pinDataList.length - previousCount;
+            
+            console.log(chalk.green(
+                `Scroll ${(i+1)}/${scrollCount}: Total ${this.pinDataList.length} pins (+${newPinsCount} new)`
+            ));
+            
+            if (newPinsCount > 0) {
+                noNewContentCount = 0;
+            } else {
+                noNewContentCount++;
+                console.log(chalk.yellow(`  No new content (attempt ${noNewContentCount}/5)`));
+                
+                if (noNewContentCount >= 5) {
+                    console.log(chalk.yellow('  Reached end'));
+                    break;
+                }
             }
+            
+            // Small wait between scroll iterations
+            await this.driver.sleep(2000);
+            
+        } catch (err) {
+            console.error(chalk.yellow(`Scroll ${i+1} error: ${(err as Error).message}`));
         }
+    }
 
-        return this.pinList;
-    };
+    console.log(chalk.green(`\n${'='.repeat(60)}`));
+    console.log(chalk.green(`Total ${this.pinDataList.length} Pins Collected`));
+    console.log(chalk.green('='.repeat(60)));
+    
+    // Keep browser open to inspect
+    console.log(chalk.yellow('\n🔍 Browser stays open for 30 seconds - watch it!'));
+    await this.driver.sleep(30000);
+    
+    await this.driver.quit();
 
-
-
-    /**
-     * @method getImages
-     * @description Returns the collected images.
-     * @returns {string[]}
-     * @memberof Pinterest
-     * @public
-     * @example const images = pinterest.getImages();
-     * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
-     */
-    getImages(): string[] {
-        return this.pinList;
-    };
+    return this.pinDataList;
+}
 
 
+    private async extractPinData(): Promise<void> {
+        try {
+            const pageSource: string = await this.driver.getPageSource();
+            
+            // Find ALL Pinterest image URLs
+            const urlMatches = pageSource.match(/https:\/\/i\.pinimg\.com\/[^"'\s]+\.(jpg|png|webp)/gi);
+            
+            if (!urlMatches) {
+                return;
+            }
 
-    /**
-     * @method getDriver
-     * @description Returns the driver object.
-     * @returns {ThenableWebDriver}
-     * @memberof Pinterest
-     * @public
-     * @example const driver = pinterest.getDriver();
-     * @see {@link https://seleniumhq.github.io/selenium/docs/api/javascript/module/selenium-webdriver/index_exports_ThenableWebDriver.html}
-     */
+            for (const imageUrl of urlMatches) {
+                // Skip thumbnails
+                if (imageUrl.includes('/60x60/') || 
+                    imageUrl.includes('/75x75/') || 
+                    imageUrl.includes('/30x30/') ||
+                    imageUrl.includes('/50x/') ||
+                    imageUrl.includes('_RS/')) {
+                    continue;
+                }
+
+                // Extract ID from image URL
+                const pinId = this.extractIdFromUrl(imageUrl);
+                
+                if (this.processedIds.has(pinId)) {
+                    continue;
+                }
+
+                this.processedIds.add(pinId);
+                
+                // Get original image URL
+                const originalUrl = this.getOriginalUrl(imageUrl);
+                
+                // Try to find Pinterest link
+                const pinLink = this.findPinLink(imageUrl, pageSource);
+                
+                this.pinDataList.push({
+                    id: pinId,
+                    link: pinLink,
+                    imageOriginal: originalUrl
+                });
+            }
+        } catch (error) {
+            // Continue silently
+        }
+    }
+
+    private findPinLink(imageUrl: string, pageSource: string): string {
+        const imgIndex = pageSource.indexOf(imageUrl);
+        const contextStart = Math.max(0, imgIndex - 1000);
+        const contextEnd = Math.min(pageSource.length, imgIndex + 1000);
+        const context = pageSource.substring(contextStart, contextEnd);
+        
+        const linkMatch = context.match(/href="(\/pin\/\d+[^"]*?)"/);
+        if (linkMatch) {
+            return 'https://pinterest.com' + linkMatch[1];
+        }
+        
+        return 'Not Available';
+    }
+
+    private getOriginalUrl(url: string): string {
+        return url
+            .replace(/\/(originals|236x|474x|564x|736x|170x|videos\/thumbnails)\//,  '/originals/')
+            .replace(/_RS\//, '/')
+            .replace(/\/\d+x\d+\//, '/originals/');
+    }
+
+    private extractIdFromUrl(url: string): string {
+        if (!url) return '';
+        
+        const match = url.match(/\/([a-f0-9]{32,})\./i);
+        if (match) return match[1];
+        
+        const pathMatch = url.match(/pinimg\.com\/[^/]+\/(.+?)\.(jpg|png|webp)/i);
+        if (pathMatch) {
+            return pathMatch[1].replace(/\//g, '_').substring(0, 50);
+        }
+        
+        return `pin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    getPinData(): PinData[] {
+        return this.pinDataList;
+    }
+
     getDriver(): ThenableWebDriver {
         return this.driver;
-    };
-
-    /**
-    * @method replacer
-    * @description Replaces the image size with the original size.
-    * @param {string} str
-    * @returns {string}
-    * @memberof Pinterest
-    * @public
-    * @example const originalSize = pinterest.replacer("https://i.pinimg.com/236x/0d/7e/3e/0d7e3e3e3e3e3e3e3e3e3e3e3e3e3e3e.jpg");
-    * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String}
-    */
-    replacer(str: string): string {
-        return str.replace("/236x/", "/originals/")
-            .replace("/474x/", "/originals/")
-            .replace("/736x/", "/originals/")
-            .replace("/564x/", "/originals/")
-    };
-
-
-
-};
+    }
+}
