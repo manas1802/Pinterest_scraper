@@ -52,92 +52,79 @@ export default class Pinterest {
         }
     }
 
-async pinCollector(scrollCount: number, url: string = this.website): Promise<PinData[]> {
-    if (scrollCount < 0) { scrollCount = 999; }
+    async pinCollector(scrollCount: number, url: string = this.website): Promise<PinData[]> {
+        if (scrollCount < 0) { scrollCount = 999; }
 
-    await this.driver.get(url);
-    await this.driver.manage().setTimeouts({ implicit: 5000 });
-    
-    await this.driver.sleep(8000);
-    
-    console.log(chalk.cyan('Starting to collect pins...'));
+        await this.driver.get(url);
+        await this.driver.manage().setTimeouts({ implicit: 5000 });
+        
+        await this.driver.sleep(8000);
+        
+        console.log(chalk.cyan('Starting to collect pins...'));
 
-    let noNewContentCount = 0;
+        let noNewContentCount = 0;
 
-    for (let i = 0; i < scrollCount; i++) {
-        try {
-            const previousCount = this.pinDataList.length;
-            
-            // Extract current pins
-            await this.extractPinData();
-            
-            // REDUCED: Scroll in TINY steps - only 150px at a time
-            console.log(chalk.gray(`  Scrolling slowly (150px x 20 steps)...`));
-            for (let step = 0; step < 20; step++) {
-                await this.driver.executeScript("window.scrollBy(0, 150);"); // REDUCED from 300-400
-                await this.driver.sleep(300); // Wait after each tiny scroll
+        for (let i = 0; i < scrollCount; i++) {
+            try {
+                const previousCount = this.pinDataList.length;
                 
-                // Extract pins every 5 steps
-                if (step % 5 === 0) {
-                    await this.extractPinData();
-                }
-            }
-            
-            // Small scroll to trigger Pinterest's infinite load
-            await this.driver.executeScript("window.scrollBy(0, 500);");
-            
-            // INCREASED: Wait longer for Pinterest to load
-            console.log(chalk.gray(`  Waiting for Pinterest to load new pins...`));
-            await this.driver.sleep(8000); // INCREASED from 5000
-            
-            // Final extract
-            await this.extractPinData();
-            
-            const newPinsCount = this.pinDataList.length - previousCount;
-            
-            console.log(chalk.green(
-                `Scroll ${(i+1)}/${scrollCount}: Total ${this.pinDataList.length} pins (+${newPinsCount} new)`
-            ));
-            
-            if (newPinsCount > 0) {
-                noNewContentCount = 0;
-            } else {
-                noNewContentCount++;
-                console.log(chalk.yellow(`  No new content (attempt ${noNewContentCount}/5)`));
+                // Extract current pins
+                await this.extractPinData();
                 
-                if (noNewContentCount >= 5) {
-                    console.log(chalk.yellow('  Reached end'));
-                    break;
+                // Scroll in TINY steps
+                for (let step = 0; step < 20; step++) {
+                    await this.driver.executeScript("window.scrollBy(0, 150);");
+                    await this.driver.sleep(300);
+                    
+                    if (step % 5 === 0) {
+                        await this.extractPinData();
+                    }
                 }
+                
+                await this.driver.executeScript("window.scrollBy(0, 500);");
+                
+                await this.driver.sleep(8000);
+                
+                await this.extractPinData();
+                
+                const newPinsCount = this.pinDataList.length - previousCount;
+                
+                console.log(chalk.green(
+                    `Scroll ${(i+1)}/${scrollCount}: Total ${this.pinDataList.length} pins (+${newPinsCount} new)`
+                ));
+                
+                if (newPinsCount > 0) {
+                    noNewContentCount = 0;
+                } else {
+                    noNewContentCount++;
+                    console.log(chalk.yellow(`  No new content (attempt ${noNewContentCount}/5)`));
+                    
+                    if (noNewContentCount >= 5) {
+                        console.log(chalk.yellow('  Reached end'));
+                        break;
+                    }
+                }
+                
+                await this.driver.sleep(2000);
+                
+            } catch (err) {
+                console.error(chalk.yellow(`Scroll ${i+1} error: ${(err as Error).message}`));
             }
-            
-            // Small wait between scroll iterations
-            await this.driver.sleep(2000);
-            
-        } catch (err) {
-            console.error(chalk.yellow(`Scroll ${i+1} error: ${(err as Error).message}`));
         }
+
+        console.log(chalk.green(`\n${'='.repeat(60)}`));
+        console.log(chalk.green(`Total ${this.pinDataList.length} Pins Collected`));
+        console.log(chalk.green('='.repeat(60)));
+        
+        await this.driver.quit();
+
+        return this.pinDataList;
     }
-
-    console.log(chalk.green(`\n${'='.repeat(60)}`));
-    console.log(chalk.green(`Total ${this.pinDataList.length} Pins Collected`));
-    console.log(chalk.green('='.repeat(60)));
-    
-    // Keep browser open to inspect
-    console.log(chalk.yellow('\n🔍 Browser stays open for 30 seconds - watch it!'));
-    await this.driver.sleep(30000);
-    
-    await this.driver.quit();
-
-    return this.pinDataList;
-}
-
 
     private async extractPinData(): Promise<void> {
         try {
             const pageSource: string = await this.driver.getPageSource();
             
-            // Find ALL Pinterest image URLs
             const urlMatches = pageSource.match(/https:\/\/i\.pinimg\.com\/[^"'\s]+\.(jpg|png|webp)/gi);
             
             if (!urlMatches) {
@@ -145,7 +132,6 @@ async pinCollector(scrollCount: number, url: string = this.website): Promise<Pin
             }
 
             for (const imageUrl of urlMatches) {
-                // Skip thumbnails
                 if (imageUrl.includes('/60x60/') || 
                     imageUrl.includes('/75x75/') || 
                     imageUrl.includes('/30x30/') ||
@@ -154,7 +140,6 @@ async pinCollector(scrollCount: number, url: string = this.website): Promise<Pin
                     continue;
                 }
 
-                // Extract ID from image URL
                 const pinId = this.extractIdFromUrl(imageUrl);
                 
                 if (this.processedIds.has(pinId)) {
@@ -163,42 +148,97 @@ async pinCollector(scrollCount: number, url: string = this.website): Promise<Pin
 
                 this.processedIds.add(pinId);
                 
-                // Get original image URL
-                const originalUrl = this.getOriginalUrl(imageUrl);
-                
-                // Try to find Pinterest link
-                const pinLink = this.findPinLink(imageUrl, pageSource);
-                
-                this.pinDataList.push({
-                    id: pinId,
-                    link: pinLink,
-                    imageOriginal: originalUrl
-                });
+                const pinData = this.extractMetadata(imageUrl, pageSource);
+                this.pinDataList.push(pinData);
             }
         } catch (error) {
             // Continue silently
         }
     }
 
-    private findPinLink(imageUrl: string, pageSource: string): string {
+    private extractMetadata(imageUrl: string, pageSource: string): PinData {
+        const pinId = this.extractIdFromUrl(imageUrl);
+        
         const imgIndex = pageSource.indexOf(imageUrl);
-        const contextStart = Math.max(0, imgIndex - 1000);
-        const contextEnd = Math.min(pageSource.length, imgIndex + 1000);
+        const contextStart = Math.max(0, imgIndex - 3000);
+        const contextEnd = Math.min(pageSource.length, imgIndex + 3000);
         const context = pageSource.substring(contextStart, contextEnd);
         
-        const linkMatch = context.match(/href="(\/pin\/\d+[^"]*?)"/);
-        if (linkMatch) {
-            return 'https://pinterest.com' + linkMatch[1];
+        // Extract alt text
+        let altText = 'Not Available';
+        const altMatch = context.match(/alt="([^"]{5,}?)"/);
+        if (altMatch) {
+            altText = altMatch[1]
+                .replace(/^This may contain:\s*/i, '')
+                .replace(/^This contains an image of:\s*/i, '')
+                .trim();
         }
         
-        return 'Not Available';
+        // Extract title
+        let title = altText;
+        const titlePatterns = [
+            /aria-label="([^"]{10,}?)"/,
+            /data-test-id="pin-title"[^>]*>([^<]+)</,
+        ];
+        
+        for (const pattern of titlePatterns) {
+            const match = context.match(pattern);
+            if (match && match[1].length > 5) {
+                title = match[1].trim().substring(0, 200);
+                break;
+            }
+        }
+        
+        // Extract description
+        let description = ' ';
+        const descPatterns = [
+            /"description":"([^"]{20,}?)"/,
+            /description['":\s]+["']([^"']{20,}?)["']/i,
+        ];
+        
+        for (const pattern of descPatterns) {
+            const match = context.match(pattern);
+            if (match && match[1].length > 10) {
+                description = match[1].trim().substring(0, 500);
+                break;
+            }
+        }
+        
+        // Extract pin link
+        let pinLink = 'Not Available';
+        const linkMatch = context.match(/href="(\/pin\/\d+[^"]*?)"/);
+        if (linkMatch) {
+            pinLink = 'https://pinterest.com' + linkMatch[1];
+        }
+        
+        // Extract board URL
+        let boardUrl = 'Not Available';
+        const boardMatch = context.match(/href="(\/[^/]+\/[^/]+\/[^"]*?)"/);
+        if (boardMatch && !boardMatch[1].includes('/pin/')) {
+            boardUrl = 'https://pinterest.com' + boardMatch[1];
+        }
+        
+        return {
+            id: pinId,
+            title: title || 'Not Available',
+            description: description,
+            altText: altText,
+            link: pinLink,
+            image170x: this.generateSizedUrl(imageUrl, '170x'),
+            image236x: this.generateSizedUrl(imageUrl, '236x'),
+            image474x: this.generateSizedUrl(imageUrl, '474x'),
+            image564x: this.generateSizedUrl(imageUrl, '564x'),
+            image736x: this.generateSizedUrl(imageUrl, '736x'),
+            imageOriginal: this.generateSizedUrl(imageUrl, 'originals'),
+            boardUrl: boardUrl
+        };
     }
 
-    private getOriginalUrl(url: string): string {
+    private generateSizedUrl(url: string, size: string): string {
         return url
-            .replace(/\/(originals|236x|474x|564x|736x|170x|videos\/thumbnails)\//,  '/originals/')
+            .replace(/\/(originals|236x|474x|564x|736x|170x|videos\/thumbnails)\//,  `/${size}/`)
             .replace(/_RS\//, '/')
-            .replace(/\/\d+x\d+\//, '/originals/');
+            .replace(/\/\d+x\d+\//, `/${size}/`);
     }
 
     private extractIdFromUrl(url: string): string {

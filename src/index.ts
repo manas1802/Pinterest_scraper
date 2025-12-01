@@ -39,7 +39,7 @@ async function main() {
             console.log(chalk.cyan(`\nCollected ${pinData.length} pins`));
             
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-            const filename = `pinterest_simple_${timestamp}`;
+            const filename = `pinterest_data_${timestamp}`;
             
             exportToCSV(pinData, filename);
             
@@ -52,8 +52,11 @@ async function main() {
             pinData.slice(0, 3).forEach((pin, index) => {
                 console.log(chalk.yellow(`\n[${index + 1}]`));
                 console.log(chalk.white(`  ID: ${pin.id}`));
+                console.log(chalk.white(`  Title: ${pin.title.substring(0, 50)}...`));
+                console.log(chalk.white(`  Description: ${pin.description.substring(0, 40)}...`));
                 console.log(chalk.white(`  Link: ${pin.link}`));
-                console.log(chalk.white(`  Image: ${pin.imageOriginal.substring(0, 60)}...`));
+                console.log(chalk.white(`  Board: ${pin.boardUrl}`));
+                console.log(chalk.white(`  Image: ${pin.imageOriginal.substring(0, 50)}...`));
             });
         } else {
             console.log(chalk.yellow('⚠ No pins collected'));
