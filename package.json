@@ -1,49 +1,33 @@
 {
   "name": "pinterest-scraper",
-  "version": "2.0.0",
-  "description": "Enhanced Pinterest Scraper - Extract images with metadata (ID, title, description, alt text) and export to Excel",
+  "version": "3.0.0",
+  "description": "Pinterest Bulk Scraper - Multi-URL Edition",
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
-    "build": "tsc --outDir ./dist",
+    "validate": "ts-node -e \"require('./src/services/csvReader').CSVReader.validateCSV('input/urls.csv')\"",
+    "build": "tsc",
     "build:start": "npm run build && node ./dist/src/index.js"
-  },
-  "funding": {
-    "type": "individual",
-    "url": "https://www.paytr.com/link/2qh0pLB?lang=en"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Bes-js/Pinterest-Scraper"
   },
   "keywords": [
     "pinterest",
-    "pin",
     "scraper",
-    "selenium",
-    "typescript",
-    "nodejs",
-    "javascript",
-    "web-scraping",
-    "pinterest-scraper",
-    "selenium-webdriver",
-    "selenium-scraper",
-    "excel-export",
-    "metadata-extraction"
+    "bulk",
+    "multi-url"
   ],
-  "author": {
-    "name": "Bes-js",
-    "url": "https://github.com/Bes-js"
-  },
-  "license": "GPL-3.0",
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
     "chalk": "^4.1.2",
     "dotenv": "^16.4.5",
-    "selenium-webdriver": "^4.33.0",
-    "xlsx": "^0.18.5"
+    "puppeteer": "^24.31.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "selenium-webdriver": "^4.33.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/puppeteer": "^5.4.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.3"
   }

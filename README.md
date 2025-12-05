@@ -1,54 +1,80 @@
-<img src="./assets/pinterest_banner.png" width="600px" height="150px">
-
 # Pinterest-Scraper
 
-*Web Scraper Application for Pinterest, Made Using TypeScript-Based Selenium Web Driver, Allows You to Extract a Specified or Unlimited Amount of Data via the Pinterest URL You Specify.*
+A TypeScript-based Pinterest bulk scraper using Puppeteer. Feed it a CSV of Pinterest URLs and it saves scraped pin data to CSV files and checkpoints so runs can be resumed.
 
-# Example
-<img src="./assets/example.gif">
+---
 
+## Quick Start (macOS)
 
+Prerequisites
 
-# Installation
-* **1 Download requirements**
-```shell
-git clone https://github.com/Bes-js/Pinterest-Scraper
+- Node.js (18+ recommended)
+- Git
+- Chrome or Chromium (Puppeteer will download a compatible Chromium by default)
+
+1. Clone and install
+
+```bash
+git clone https://github.com/Bes-js/Pinterest-Scraper.git
 cd Pinterest-Scraper
 npm install
 ```
 
-* **2 Download ChromeDriver Or Google Chrome**
+2. Configure environment
 
-[ChromeDriver](https://chromedriver.chromium.org/downloads) via Driver, [Chrome Browser](https://www.google.com/chrome/) You can also install Chrome Browser from here, skip this step if it is already available.
-
-# Usage
-
-Example .env File
-```js
-websiteURL=https://pinterest.com/search/pins/?q=anime&rs=typed /* Pinterest URL to Scrape */
-email=test@gmail.com /* Pinterest Email */
-password=test123 /* Pinterest Password */
-scrollCount=1 /* Page Scrool Count */
+```bash
+cp .env.example .env
+# Edit .env and set EMAIL, PASSWORD and optional settings
+open .env    # or use your editor
 ```
-#
-Console to compile and run with JavaScript;
-```shell
-npm run build:start
-```
-#
-Or to the Console to Run Directly with ts-node;
-```shell
+
+Important vars live in `.env` (see `.env.example`).
+
+3. Prepare input CSV
+
+- Default path: `input/urls.csv` (set via INPUT_CSV in .env)
+- CSV format: header row then one URL per line (legacy formats supported).
+
+4. Run
+
+- Development / direct (requires ts-node):
+
+```bash
 npm run start
 ```
 
-# Donation & Support
-<a href="https://www.buymeacoffee.com/beykant" target="_blank">
-<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" width="120px" height="30px" alt="Buy Me A Coffee">
-</a>
-<br>
-<a href="https://www.paytr.com/link/2qh0pLB?lang=en" target="_blank">
-<img src="./assets/pay_tr.png" width="120px" height="50px" alt="Buy Me A Coffee">
-</a>
+5. Output & checkpoints
 
-[![Discord Banner](https://api.weblutions.com/discord/invite/luppux/)](https://discord.gg/luppux)
+- Output directory: configured via OUTPUT_DIR in `.env` (default `output`)
+- CSV exporter writes per-run CSV files. Checkpoints are stored in `checkpoints` so interrupted runs can resume.
 
+6. Interrupts & errors
+
+- Press Ctrl+C to stop; progress is saved.
+- Logs and progress CSVs are written into the output directory.
+
+---
+
+## Useful commands
+
+- Install: `npm install`
+- Start (ts-node): `npm run start`
+
+---
+
+## Where to look in the repo
+
+- Entry point: `src/index.ts`
+- CSV reader/validation: `src/services/csvReader.ts`
+- Progress & checkpointing: `src/services/progressTracker.ts`
+- CSV export: `src/utils/csvExporter.ts`
+- Example env: `.env.example`
+- Scripts & dependencies: `package.json`
+
+---
+
+If something fails, check:
+
+- `.env` values (EMAIL/PASSWORD, INPUT_CSV, OUTPUT_DIR)
+- Chrome/Chromium availability
+- `output` and `checkpoints` directories for logs and partial data
